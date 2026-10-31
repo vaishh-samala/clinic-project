@@ -1,0 +1,6 @@
+{
+  "name": "Clinic Agent - Healthcare Management & Clinical Assistant",
+  "description": "Modern healthcare operations dashboard and clinical AI assistant for patient triage, appointment scheduling, and clinic management.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

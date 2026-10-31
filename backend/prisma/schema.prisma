@@ -1,0 +1,135 @@
+// Prisma schema for Clinic AI Agent Backend
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  PATIENT
+  DOCTOR
+  ADMIN
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+model User {
+  id           String    @id @default(uuid())
+  name         String
+  email        String    @unique
+  passwordHash String
+  role         Role      @default(PATIENT)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  patient      Patient?
+  doctor       Doctor?
+
+  @@index([email])
+  @@index([role])
+}
+
+model Patient {
+  id                 String         @id @default(uuid())
+  userId             String         @unique
+  user               User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dateOfBirth        DateTime
+  phoneNumber        String
+  emergencyContact   String?
+  medicalHistory     String?
+  allergies          String?
+  currentMedications String?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  appointments       Appointment[]
+  conversations      Conversation[]
+
+  @@index([userId])
+  @@index([phoneNumber])
+}
+
+model Doctor {
+  id             String        @id @default(uuid())
+  userId         String?       @unique
+  user           User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  name           String
+  email          String        @unique
+  specialization String
+  qualifications String
+  roomNumber     String?
+  availability   Json          // Schedule rules: e.g. { workDays: ["MONDAY", "TUESDAY", ...], startTime: "09:00", endTime: "17:00", slotDurationMinutes: 30 }
+  isActive       Boolean       @default(true)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  appointments   Appointment[]
+
+  @@index([specialization])
+  @@index([isActive])
+}
+
+model Appointment {
+  id         String            @id @default(uuid())
+  patientId  String
+  patient    Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctorId   String
+  doctor     Doctor            @relation(fields: [doctorId], references: [id], onDelete: Restrict)
+  date       DateTime          @db.Date
+  timeSlot   String            // Format: "HH:mm" e.g. "09:00", "09:30"
+  status     AppointmentStatus @default(PENDING)
+  reason     String
+  notes      String?
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  @@index([patientId])
+  @@index([doctorId])
+  @@index([date])
+  @@index([status])
+  // Compound index to accelerate availability and collision lookups
+  @@index([doctorId, date, timeSlot])
+}
+
+model Conversation {
+  id        String       @id @default(uuid())
+  sessionId String       @unique
+  patientId String?
+  patient   Patient?     @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  title     String?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  messages  Message[]
+
+  @@index([sessionId])
+  @@index([patientId])
+}
+
+model Message {
+  id             String       @id @default(uuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           MessageRole
+  content        String
+  metadata       Json?        // Tool calls, urgency level, suggested follow-ups
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId])
+  @@index([createdAt])
+}
